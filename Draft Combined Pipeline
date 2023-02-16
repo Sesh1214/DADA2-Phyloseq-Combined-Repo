@@ -139,7 +139,11 @@ head(taxa.print)
 
 #samdf <- Change this to read in the sample metadata from an excel file
 ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), sample_data(samdf), tax_table(taxa))
-
+setwd('~/Fastq')
+rank_names(ps)
+ps_genus <- tax_glom(ps, "Genus")
+p1 <- plot_bar(ps_genus, fill = "Genus")
+ggsave(filename = 'ps_genus.pdf', plot=p1, width=30, height=8)
 
 
 
