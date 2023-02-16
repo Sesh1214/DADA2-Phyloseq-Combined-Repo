@@ -38,8 +38,6 @@ install.packages("gplots")
 library(gplots)
 install.packages("pheatmap")
 library(pheatmap)
-install.packages("ComplexHeatMap")
-library(ComplexHeatMap)
 install.packages("circlize")
 library(circlize)
 #ComplexHeatMap Installation
