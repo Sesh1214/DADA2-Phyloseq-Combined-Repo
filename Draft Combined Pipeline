@@ -145,6 +145,39 @@ ps_genus <- tax_glom(ps, "Genus")
 p1 <- plot_bar(ps_genus, fill = "Genus")
 ggsave(filename = 'ps_genus.pdf', plot=p1, width=30, height=8)
 
+#Trying to Create a Phylogenetic Tree with the Ape package and then a Heatmap
+prog_data <- sample_data(data.frame(Progression = samdf$progression, Progression_Days = samdf$progression_days, row.names = sample_names(ps), stringsAsFactors = FALSE))
+head(prog_data)
+library("ape")
+genus_tree <- rtree(ntaxa(ps), rooted = TRUE, tip.label = taxa_names(ps))
+plot(genus_tree)
 
+genus_phyloseq <- merge_phyloseq(ps, prog_data, genus_tree)
+genus_phyloseq
+plot_tree(genus_phyloseq, color = "Progression_Days", label.tips = "taxa_names(ps)", ladderize = "left", plot.margin = 0.3)
+plot_heatmap(genus_phyloseq, taxa.label = "Genus", taxa.order = "Genus")
 
+#Make this Biplot look better - Phyloseq package has functions for ordination including using Manhattan Distances
+ps_ord <- ordinate(ps, "PCoA", "manhattan")
+plot_ps_otus_ord_mets <- plot_ordination(ps, ps_ord, type = "otu", label = "Genus", color = "Genus")
+plot_ps_samples_ord_mets <- plot_ordination(ps, ps_ord, type = "samples", label = "X.SampleID", color = "metastasis")
+plot_ps_samples_ord_mets
+plot_ps_samples_ord_progression <- plot_ordination(ps, ps_ord, type = "samples", label = "X.SampleID", color = "Progression")
+plot_ps_samples_ord_progression
+plot_ps_samples_ord_category1 <- plot_ordination(ps, ps_ord, type = "samples", label = "X.SampleID", color = "Category1")
+plot_ps_samples_ord_category1
+plot_ps_samples_ord_category2 <- plot_ordination(ps, ps_ord, type = "samples", label = "X.SampleID", color = "Category2")
+plot_ps_samples_ord_category2 
+plot_ps_samples_ord_clincat <- plot_ordination(ps, ps_ord, type = "samples", label = "X.SampleID", color = "ClinicalCategory")
+plot_ps_samples_ord_clincat
 
+#K-Means Clustering On the Samples with the co-ordinates extracted from the PCOA plot - The phyloseq package uses ggplot so you can just use ggplot_build and proceed from there
+
+data_from_ps_samples_ord_mets <- ggplot_build(plot_ps_samples_ord_mets)
+data_from_ps_samples_ord_mets$data
+df_data_from_ps_samples_ord_mets <- as.data.frame(data_from_ps_samples_ord_mets$data)
+colnames(df_data_from_ps_samples_ord_mets)
+kmeans_df_ps <- df_data_from_famglom_samples_ord_mets[,c('x','y')]
+head(kmeans_df_ps)
+cluster_ps <- kmeans(kmeans_df_ps, 3, nstart = 20)
+fviz_cluster(cluster_ps, data = kmeans_df_ps, palette = c("#2E9FDF", "#00AFBB", "#E7B800"), geom = "point", ellipse.type = "convex", ggtheme = theme_bw(), main = "Clusters of Patient Samples")
