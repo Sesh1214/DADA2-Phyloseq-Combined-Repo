@@ -177,7 +177,7 @@ data_from_ps_samples_ord_mets <- ggplot_build(plot_ps_samples_ord_mets)
 data_from_ps_samples_ord_mets$data
 df_data_from_ps_samples_ord_mets <- as.data.frame(data_from_ps_samples_ord_mets$data)
 colnames(df_data_from_ps_samples_ord_mets)
-kmeans_df_ps <- df_data_from_famglom_samples_ord_mets[,c('x','y')]
+kmeans_df_ps <- df_data_from_ps_samples_ord_mets[,c('x','y')]
 head(kmeans_df_ps)
 cluster_ps <- kmeans(kmeans_df_ps, 3, nstart = 20)
 fviz_cluster(cluster_ps, data = kmeans_df_ps, palette = c("#2E9FDF", "#00AFBB", "#E7B800"), geom = "point", ellipse.type = "convex", ggtheme = theme_bw(), main = "Clusters of Patient Samples")
