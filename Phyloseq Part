@@ -1,0 +1,34 @@
+library(phyloseq)
+library(vegan)
+library(ggplot2)
+setwd("//ueahome/eresfmh5/yfe22ruu/data/NTProfile/Desktop/May 2022")
+seqtab_absolute <- read.csv("seqtab.csv", header = TRUE, row.names = 1)
+seqtab_relative <- decostand(seqtab_absolute, method='total', MARGIN = 1)
+View(seqtab_relative)
+taxa_df <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa_matrix <- as.matrix(taxa_df)
+
+#Preparing and Creating the Phyloseq Object
+otu_tab <- otu_table(seqtab_relative, taxa_are_rows = FALSE)
+sample_dat <- sample_data(metadata)
+tax_dat <- tax_table(taxa_matrix)
+ps <- merge_phyloseq(otu_tab, sample_dat, tax_dat)
+rank_names(ps)
+
+#Genus Level Phyloseq Object
+ps_genus <- tax_glom(ps, "Genus")
+p1 <- plot_bar(ps_genus, fill = "Genus")
+ggsave(filename = 'ps_genus.pdf', plot=p1, width=30, height=8)
+
+#Family level Phyloseq Object
+ps_family <- tax_glom(ps, "Family")
+p2 <- plot_bar(ps_family, fill = "Family")
+ggsave(filename = 'ps_family.pdf', plot=p2, width=30, height=8)
+
+#Ordination to Manhattan Distances at Genus and Family Level
+genus_ord <- ordinate(ps_genus, "PCoA", "manhattan")
+family_ord <- ordinate(ps_family, "PCoA", "manhattan")
+
+#Genus Ordination Plots
+genus_plot1 <- plot_ordination(ps_genus, genus_ord, type = "taxa", color = "Genus", title = "taxa")
+print(genus_plot1)
