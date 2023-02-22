@@ -1,16 +1,16 @@
 library(phyloseq)
 library(vegan)
 library(ggplot2)
-setwd("//ueahome/eresfmh5/yfe22ruu/data/NTProfile/Desktop/May 2022")
-seqtab_absolute <- read.csv("seqtab.csv", header = TRUE, row.names = 1)
-seqtab_relative <- decostand(seqtab_absolute, method='total', MARGIN = 1)
+seqtab_absolute_noblanks <- read.csv("seqtab_noblanks.csv", header = TRUE, row.names = 1)
+seqtab_relative_noblanks <- decostand(seqtab_absolute_noblanks, method='total', MARGIN = 1)
 View(seqtab_relative)
 taxa_df <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
 taxa_matrix <- as.matrix(taxa_df)
+metadata_noblanks <- read.csv("Metadata_May2022_noblanks.csv", header = TRUE, row.names = 1)
 
 #Preparing and Creating the Phyloseq Object
-otu_tab <- otu_table(seqtab_relative, taxa_are_rows = FALSE)
-sample_dat <- sample_data(metadata)
+otu_tab <- otu_table(seqtab_relative_noblanks, taxa_are_rows = FALSE)
+sample_dat <- sample_data(metadata_noblanks)
 tax_dat <- tax_table(taxa_matrix)
 ps <- merge_phyloseq(otu_tab, sample_dat, tax_dat)
 rank_names(ps)
@@ -25,10 +25,50 @@ ps_family <- tax_glom(ps, "Family")
 p2 <- plot_bar(ps_family, fill = "Family")
 ggsave(filename = 'ps_family.pdf', plot=p2, width=30, height=8)
 
-#Ordination to Manhattan Distances at Genus and Family Level
-genus_ord <- ordinate(ps_genus, "PCoA", "manhattan")
-family_ord <- ordinate(ps_family, "PCoA", "manhattan")
+#Heatmap
+genus_heatmap <- plot_heatmap(ps, "PCoA", "manhattan", taxa.label = "Genus", taxa.order = "Genus", low = "#66CCFF", high = "#000033", na.value = "white")
+ggsave(filename = "genus_heatmap.pdf", plot = genus_heatmap, width = 30, height = 8)
+family_heatmap <- plot_heatmap(ps, "PCoA", "manhattan", taxa.label = "Family", taxa.order = "Family", low = "#66CCFF", high = "#000033", na.value = "white")
+ggsave(filename = "family_heatmap.pdf", plot = genus_heatmap, width = 30, height = 8)
 
-#Genus Ordination Plots
-genus_plot1 <- plot_ordination(ps_genus, genus_ord, type = "taxa", color = "Genus", title = "taxa")
-print(genus_plot1)
+#Plot Ordination
+ps.ord <- ordinate(ps, "PCoA", "manhattan")
+p1 <- plot_ordination(ps, ps.ord, type = "taxa", color = "Genus", title = "Genus Ordination Plot")
+ggsave(filename = "Genus_PCOA.pdf", plot = p1, width = 30, height = 8)
+p2 <- plot_ordination(ps, ps.ord, type = "taxa", color = "Family", title = "Family Ordination Plot")
+ggsave(filename = "Family_PCOA.pdf", plot = p2, width = 30, height = 8)
+p3 <- plot_ordination(ps, ps.ord, type = "samples", label = "sample_id", color = "metastasis", title = "Metastatic Samples")
+ggsave(filename = "Metastatic Samples.pdf", plot = p3, width = 30, height = 8)
+p4 <- plot_ordination(ps, ps.ord, type = "samples", label = "sample_id", color = "subcategory_at_initial_urine_collection", title = "Subcategory at Initial Urine Collection")
+ggsave(filename = "Subcategory at Initial Urine Collection.pdf", plot = p4, width = 30, height = 8)
+
+#PCOA Plot After Extracting Co-Ordinates
+class(seqtab_relative_noblanks)
+seqtab_matrix <- as.matrix(seqtab_relative_noblanks)
+dist_matrix_genus <- dist(seqtab_matrix, method = "manhattan")
+pcoa_genus <- pcoa(dist_matrix_genus, correction = "none", rn = NULL)
+biplot_genus <- biplot(pcoa_genus, plot.axes = c(1,2), dir.axis1=1, dir.axis2=1, rn = NULL, main = NULL)
+biplot_genus
+ggsave(filename = "PCOA Plot of Samples Without Blanks.pdf", plot = biplot_genus, width = 30, height = 8)
+
+#Extract the Axis co-ordinates and do K-Means on them
+pcoa_genus$vectors
+pcoa_coords <- as.data.frame(pcoa_genus$vectors)
+head(pcoa_coords)
+pcoa_coords_final1 <- as.data.frame(pcoa_coords$Axis.1)
+pcoa_coords_final2 <- as.data.frame(pcoa_coords$Axis.2)
+pcoa_coords_genus_final <- cbind(pcoa_coords_final1, pcoa_coords_final2)
+kmeans_genus <- kmeans(pcoa_coords_genus_final, 3, nstart = 20)
+kmeans_genus
+kmeans_plot <- plot(pcoa_coords_genus_final, col = (kmeans_genus$cluster + 1), main = "K-Means Clustering of Samples - May 2022", xlab = "", ylab = "", pch = 20, cex = 2)
+ggsave(filename = "KMeansClustering.pdf", plot = kmeans_plot, width = 30, height = 8)
+
+#Create a Dataframe with The Cluster, Sample, Clinical Data and PCOA Co-Ordinates
+sample_list <- cbind(kmeans_clusterdata, pcoa_coords_genus_final)
+head(sample_list)
+rownames(seqtab_absolute_noblanks)
+rownames(sample_list) <- rownames(seqtab_absolute_noblanks)
+head(sample_list)
+sample_cluster_list <- cbind(sample_list, metadata_noblanks)
+write.csv(file = "Sample_Cluster_List.csv", sample_cluster_list)
+ggplot(sample_cluster_list, aes(x=pcoa_coords$Axis.1, y=pcoa_coords$Axis.2, color = metastasis)) + geom_point(alpha = 0.5, size = 1) + geom_text(aes(label = rownames(sample_list)))
