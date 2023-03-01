@@ -2,12 +2,18 @@ library(phyloseq)
 library(vegan)
 library(ggplot2)
 library(ape)
+library(tidyverse)
+library(microViz)
+library(factoextra)
+library(cluster)
+set.seed(202)
 seqtab_absolute_noblanks <- read.csv("seqtab_noblanks.csv", header = TRUE, row.names = 1)
 seqtab_relative_noblanks <- decostand(seqtab_absolute_noblanks, method='total', MARGIN = 1)
-View(seqtab_relative)
+write.csv(file = "seqtab_relative.csv", seqtab_relative_noblanks)
+View(seqtab_relative_noblanks)
 taxa_df <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
 taxa_matrix <- as.matrix(taxa_df)
-metadata_noblanks <- read.csv("Metadata_May2022_noblanks.csv", header = TRUE, row.names = 1)
+metadata_noblanks <- read.csv("Metadata_May2022.csv", header = TRUE, row.names = 1)
 
 #Preparing and Creating the Phyloseq Object
 otu_tab <- otu_table(seqtab_relative_noblanks, taxa_are_rows = FALSE)
@@ -30,15 +36,6 @@ ggsave(filename = 'ps_family.pdf', plot=p2, width=30, height=8)
 #Making This Interactive with Plotly and Viewing it on the local browser. This does it for the entire phyloseq object
 ps_updated <- tax_fix(ps) %>% phyloseq_validate()
 ord_explore(ps_updated)
-
-#Create a Phyloseq Object to Compare the following
-#Create One with Only Cluster 1 and compare metastatic to non-metastatic samples within the cluster
-#Create One for Clusters 2 and 3 separately and compare them.
-#Create one for clusters 2 and 3 together and compare them.
-seqtab_relative_13 <- read.csv("seqtab_relative_Cluster1_Cluster3.csv", header = TRUE, row.names = 1)
-taxa_df <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
-taxa_matrix <- as.matrix(taxa_df)
-metadata_13 <- read.csv("Metadata_NonMetsClusters.csv", header = TRUE, row.names = 1)
 
 #Heatmap
 genus_heatmap <- plot_heatmap(ps, "PCoA", "manhattan", taxa.label = "Genus", taxa.order = "Genus", low = "#66CCFF", high = "#000033", na.value = "white")
@@ -64,7 +61,6 @@ dist_matrix_genus <- dist(seqtab_matrix, method = "manhattan")
 pcoa_genus <- pcoa(dist_matrix_genus, correction = "none", rn = NULL)
 biplot_genus <- biplot(pcoa_genus, plot.axes = c(1,2), dir.axis1=1, dir.axis2=1, rn = NULL, main = NULL)
 biplot_genus
-ggsave(filename = "PCOA Plot of Samples Without Blanks.pdf", plot = biplot_genus, width = 30, height = 8)
 
 #Extract the Axis co-ordinates and do K-Means on them
 pcoa_genus$vectors
@@ -77,15 +73,69 @@ kmeans_genus <- kmeans(pcoa_coords_genus_final, 3, nstart = 20)
 kmeans_genus
 kmeans_plot <- plot(pcoa_coords_genus_final, col = (kmeans_genus$cluster + 1), main = "K-Means Clustering of Samples - May 2022", xlab = "", ylab = "", pch = 20, cex = 2)
 ggsave(filename = "KMeansClustering.pdf", plot = kmeans_plot, width = 30, height = 8)
-kmeans_clusterdata <- kmeans_genus$cluster
+kmeans_clusterdata <- as.data.frame(kmeans_genus$cluster)
 sample_list <- cbind(kmeans_clusterdata, pcoa_coords_genus_final)
 head(sample_list)
 rownames(seqtab_absolute_noblanks)
 rownames(sample_list) <- rownames(seqtab_absolute_noblanks)
 head(sample_list)
 sample_cluster_list <- cbind(sample_list, metadata_noblanks)
+head(sample_cluster_list)
+sample_cluster_list2 <- sample_cluster_list[, -4]
+sample_cluster_list2 <- sample_cluster_list2[, -10]
+head(sample_cluster_list2)
 write.csv(file = "Sample_Cluster_List.csv", sample_cluster_list)
-ggplot(sample_cluster_list, aes(x=pcoa_coords$Axis.1, y=pcoa_coords$Axis.2, color = metastasis)) + geom_point(alpha = 0.5, size = 1) + geom_text(aes(label = rownames(sample_list)))
+ggplot(sample_cluster_list2, aes(x=pcoa_coords$Axis.1, y=pcoa_coords$Axis.2, color = metastasis)) + geom_point(alpha = 0.5, size = 2) + geom_text(aes(label = rownames(sample_list)))
+
+head(seqtab_relative_noblanks)
+cluster_list <- data.frame(sample_cluster_list2$`kmeans_genus$cluster`)
+seqtab_cluster <- cbind(cluster_list, seqtab_relative_noblanks)
+
+#Create a Phyloseq Object for Only CLuster 1
+seqtab_cluster1 <- seqtab_cluster[seqtab_cluster$sample_cluster_list2..kmeans_genus.cluster. == 1, ]
+head(seqtab_cluster1)
+taxa_1 <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa1_matrix <- as.matrix(taxa_1)
+cluster1_metadata <- sample_cluster_list2[sample_cluster_list$`kmeans_genus$cluster` == 1, ] 
+
+otu_tab1 <- otu_table(seqtab_cluster1, taxa_are_rows = FALSE)
+sample_dat1 <- sample_data(cluster1_metadata)
+tax_dat1 <- tax_table(taxa1_matrix)
+ps1 <- merge_phyloseq(otu_tab1, sample_dat1, tax_dat1)
+rank_names(ps1)
+ps1_updated <- tax_fix(ps1) %>% phyloseq_validate()
+ord_explore(ps1_updated)
+
+#Create a Phyloseq Object for Only Cluster 2
+seqtab_cluster2 <- seqtab_cluster[seqtab_cluster$sample_cluster_list2..kmeans_genus.cluster. == 2, ]
+head(seqtab_cluster2)
+taxa_2 <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa2_matrix <- as.matrix(taxa_2)
+cluster2_metadata <- sample_cluster_list2[sample_cluster_list$`kmeans_genus$cluster` == 2, ] 
+
+otu_tab2 <- otu_table(seqtab_cluster2, taxa_are_rows = FALSE)
+sample_dat2 <- sample_data(cluster2_metadata)
+tax_dat2 <- tax_table(taxa2_matrix)
+ps2 <- merge_phyloseq(otu_tab2, sample_dat2, tax_dat2)
+rank_names(ps2)
+ps2_updated <- tax_fix(ps2) %>% phyloseq_validate()
+ord_explore(ps2_updated)
+
+
+#Create a Phyloseq Object for Only Cluster 3 - This is the one with most metastatic samples
+seqtab_cluster3 <- seqtab_cluster[seqtab_cluster$sample_cluster_list2..kmeans_genus.cluster. == 3, ]
+head(seqtab_cluster3)
+taxa_3 <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa3_matrix <- as.matrix(taxa_3)
+cluster3_metadata <- sample_cluster_list2[sample_cluster_list$`kmeans_genus$cluster` == 3, ] 
+
+otu_tab3 <- otu_table(seqtab_cluster3, taxa_are_rows = FALSE)
+sample_dat3 <- sample_data(cluster3_metadata)
+tax_dat3 <- tax_table(taxa3_matrix)
+ps3 <- merge_phyloseq(otu_tab3, sample_dat3, tax_dat3)
+rank_names(ps3)
+ps3_updated <- tax_fix(ps3) %>% phyloseq_validate()
+ord_explore(ps3_updated)
 
 #Network analysis
 ps_network <- plot_net(ps, type = "taxa", distance = "manhattan", point_alpha = 1, point_label = "Genus", rescale = TRUE, point_size = 2)
@@ -98,31 +148,40 @@ head(ps_network_coords)
 ggplot(ps_network_coords, aes(x=ps_network_data.x, y = ps_network_data.y))+ geom_point()
 ps_network_coords_matrix <- as.matrix(ps_network_coords)
 ps_network_coords_matrix[is.na(ps_network_coords_matrix)] <- "Genus unassigned"
-ps_network_coords_only <- data.frame(ps_network_coords$X_Axis, ps_network_coords$Y_Axis)
+ps_network_coords_only <- data.frame(ps_network_coords$ps_network_data.x, ps_network_coords$ps_network_data.y)
+fviz_nbclust(ps_network_coords_only, kmeans, method = "silhouette")
 fviz_nbclust(ps_network_coords_only, kmeans, method = "wss")
-kmeans_ps_network_three <- kmeans(ps_network_coords_only, 3, nstart = 20)
-kmeans_ps_network_three
-kmeans_ps_network_four <- kmeans(ps_network_coords_only, 4, nstart = 20)
-kmeans_ps_network_four
-kmeans_ps_network_seven <- kmeans(ps_network_coords_only, 7, nstart = 20)
-kmeans_ps_network_seven
-ps_network_coords_cluster <- cbind(ps_network_coords, kmeans_ps_network_three$cluster)
-head(ps_network_coords_cluster)
-kmeans_plot_3 <- plot(ps_network_coords_only, col = (kmeans_ps_network_three$cluster + 1), main = "K-Means Clustering of Bacterial Genuses in May 2022 Samples, k = 3", xlab = "", ylab = "", pch = 20, cex = 0.5)
-cluster1_genuses <- ps_network_coords_cluster[ps_network_coords_cluster$`kmeans_ps_network_three$cluster` == 1, ]
-cluster2_genuses <- ps_network_coords_cluster[ps_network_coords_cluster$`kmeans_ps_network_three$cluster` == 2, ]
-cluster3_genuses <- ps_network_coords_cluster[ps_network_coords_cluster$`kmeans_ps_network_three$cluster` == 3, ]
-
+kmeans_ps_network_two <- kmeans(ps_network_coords_only, 2, nstart = 20)
+kmeans_ps_network_two
+#kmeans_ps_network_four <- kmeans(ps_network_coords_only, 4, nstart = 20)
+#kmeans_ps_network_four
+#kmeans_ps_network_seven <- kmeans(ps_network_coords_only, 7, nstart = 20)
+#kmeans_ps_network_seven
+#ps_network_coords_3cluster <- cbind(ps_network_coords, kmeans_ps_network_three$cluster)
+#head(ps_network_coords_3cluster)
+#kmeans_plot_3 <- plot(ps_network_coords_only, col = (kmeans_ps_network_three$cluster + 1), main = "K-Means Clustering of Bacterial Genuses in May 2022 Samples, k = 3", xlab = "", ylab = "", pch = 20, cex = 0.5)
+#cluster1_genuses <- ps_network_coords_3cluster[ps_network_coords_3cluster$`kmeans_ps_network_three$cluster` == 1, ]
+#cluster3_genuses <- ps_network_coords_3cluster[ps_network_coords_3cluster$`kmeans_ps_network_three$cluster` == 3, ]
+#cluster2_genuses <- ps_network_coords_3cluster[ps_network_coords_3cluster$`kmeans_ps_network_three$cluster` == 2, ]
+ps_network_coords_2cluster <- cbind(ps_network_coords, kmeans_ps_network_two$cluster)
+head(ps_network_coords_2cluster)
+kmeans_plot_2 <- plot(ps_network_coords_only, col = (kmeans_ps_network_two$cluster + 1), main = "K-Means Clustering of Bacterial Genuses in May 2022 Samples, k = 2", xlab = "", ylab = "", pch = 20, cex = 0.5)
+cluster1_genuses <- ps_network_coords_2cluster[ps_network_coords_2cluster$`kmeans_ps_network_two$cluster` == 1, ]
+cluster2_genuses <- ps_network_coords_2cluster[ps_network_coords_2cluster$`kmeans_ps_network_two$cluster` == 2, ]
+write.csv(file = "cluster1_genuses.csv", cluster1_genuses)
+write.csv(file = "cluster2_genuses.csv", cluster2_genuses)
+head(cluster1_genuses)
+head(cluster2_genuses)
+abbs_cluster1 <- cluster1_genuses %>% filter_all(any_vars(. %in% c('Porphyromonas', 'Fenollaria', 'Anaerococcus', 'Ezakiella', 'Fusobacterium', 'Peptoniphilus')))
+abbs_cluster2 <- cluster2_genuses %>% filter_all(any_vars(. %in% c('Porphyromonas', 'Fenollaria', 'Anaerococcus', 'Ezakiella', 'Fusobacterium', 'Peptoniphilus')))
 
 #Wilcox Test
-#I have separated out Clusters 1 and 3 into a single dataframe and Cluster 2 into a separate dataframe
-#Cluster 2 has the metastatic samples
-cluster13_abundance <- read.csv("seqtab_relative_Cluster1_Cluster3.csv", header = TRUE, row.names = 1)
-cluster2_abundance <- read.csv("seqtab_relative_Cluster2.csv", header = TRUE, row.names = 1)
-cluster13_matrix <- as.matrix(cluster13_abundance)
-cluster2_matrix <- as.matrix(cluster2_abundance)
-wilcox_result <- wilcox.test(cluster13_matrix, cluster2_matrix)
-#Create a Phyloseq Object to Compare the following
-#Create One with Only Cluster 3 and compare metastatic to non-metastatic samples within the cluster
-#Create One for Clusters 1 and 2 separately and compare them.
-#Creare one for clusters 1 and 2 together and compare them.
+seqtab1_matrix <- as.matrix(seqtab_cluster1)
+seqtab2_matrix <- as.matrix(seqtab_cluster2)
+seqtab3_matrix <- as.matrix(seqtab_cluster3)
+wilcox_result12 <- wilcox.test(seqtab1_matrix, seqtab2_matrix)
+wilcox_result13 <- wilcox.test(seqtab1_matrix, seqtab3_matrix)
+wilcox_result23 <- wilcox.test(seqtab2_matrix, seqtab3_matrix)
+seqtab12_matrix <- rbind(seqtab1_matrix,seqtab2_matrix)
+wilcox_result3_12 <- wilcox.test(seqtab3_matrix, seqtab12_matrix)
+wilcox_result3_12
