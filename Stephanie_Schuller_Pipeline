@@ -76,3 +76,5 @@ taxa <- assignTaxonomy(seqtab.nochim, db_path, multithread=FALSE)
 taxa.print <- taxa # Removing sequence rownames for display only
 rownames(taxa.print) <- NULL
 head(taxa.print)
+write.csv("Taxa_Print.csv", taxa.print)
+write.csv("Seqtab_Nochim.csv", seqtab.nochim)
