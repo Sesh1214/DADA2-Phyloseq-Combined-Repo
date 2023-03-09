@@ -13,20 +13,20 @@ sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 
 #Plot the Read Quality for the forward and reverse paired end reads and put them in separate PDFs
 #This part of the code does not work properly in HPC. Have to figure out how to get these plots into a PDF and put that in. Possibly assign each of the plots to variables and then use ggplot? The other option is to do the entire pipeline locally simply because the datasets are going to be small and then go on to upload the results onto the shared database. But it would be useful to actually know how to get everything onto HPC. Although saying that, even for my own data I will always need to look at the Quality profile before deciding filter criteria so maybe that should be done locally?
-pdf(file = "Read_Quality_Profiles_FWD.pdf", width = 4, height = 4)
-plotQualityProfile(fnFs[1:6])
-plotQualityProfile(fnFs[7:12])
-plotQualityProfile(fnFs[13:18])
-plotQualityProfile(fnFs[19:24])
-plotQualityProfile(fnFs[25:30])
-dev.off()
-pdf(file = "Read_Quality_Profiles_REV.pdf", width = 4, height = 4)
-plotQualityProfile(fnRs[1:6])
-plotQualityProfile(fnRs[7:12])
-plotQualityProfile(fnRs[13:18])
-plotQualityProfile(fnRs[19:24])
-plotQualityProfile(fnRs[25:30])
-dev.off()
+#pdf(file = "Read_Quality_Profiles_FWD.pdf", width = 4, height = 4)
+#plotQualityProfile(fnFs[1:6])
+#plotQualityProfile(fnFs[7:12])
+#plotQualityProfile(fnFs[13:18])
+#plotQualityProfile(fnFs[19:24])
+#plotQualityProfile(fnFs[25:30])
+#dev.off()
+#pdf(file = "Read_Quality_Profiles_REV.pdf", width = 4, height = 4)
+#plotQualityProfile(fnRs[1:6])
+#plotQualityProfile(fnRs[7:12])
+#plotQualityProfile(fnRs[13:18])
+#plotQualityProfile(fnRs[19:24])
+#plotQualityProfile(fnRs[25:30])
+#dev.off()
 
 # Place filtered files in filtered/ subdirectory
 filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
@@ -41,9 +41,10 @@ print(out)
 errF <- learnErrors(filtFs, multithread=FALSE)
 errR <- learnErrors(filtRs, multithread=FALSE)
 
-pdf(file = "~/Fastq/Error_Plots.pdf")
-plotErrors(errF, nominalQ=TRUE)
-dev.off()
+#pdf(file = "Error_Plots.pdf", width = 4, height = 4)
+#plotErrors(errF, nominalQ=TRUE)
+#plotErrors(errR, nominalQ=TRUE)
+#dev.off()
 
 dadaFs <- dada(filtFs, err=errF, multithread=FALSE)
 dadaRs <- dada(filtRs, err=errR, multithread=FALSE)
@@ -71,7 +72,7 @@ colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "n
 rownames(track) <- sample.names
 head(track)
 
-db_path = "/gpfs/afm/cancergenetics/Seshadhri/Stephanie_Schuller_Data/Fastq_Files/GTDB_bac-arc_ssu_r86.fa.gz"
+db_path = "/gpfs/afm/cancergenetics/Seshadhri/Stephanie_Schuller_Data/GTDB_bac-arc_ssu_r86.fa.gz"
 
 taxa <- assignTaxonomy(seqtab.nochim, db_path, multithread=FALSE)
 taxa.print <- taxa # Removing sequence rownames for display only
