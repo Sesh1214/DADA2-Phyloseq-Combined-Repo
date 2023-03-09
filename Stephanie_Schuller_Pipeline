@@ -1,7 +1,7 @@
 install.packages("dada2")
 #Before starting, make sure to unzip the fastq files. Can use gzip -d command on terminal to do this
 library(dada2)
-path <- "/gpfs/afm/cancergenetics/Seshadhri/Stephanie_Schuller_Data/Fastq_Files"
+path <- "/gpfs/afm/cancergenetics/Seshadhri/Stephanie_Schuller_Data/Fastq"
 #The list files command should list all the paired end reads for each sample.
 list.files(path)
 
@@ -12,19 +12,20 @@ fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
 sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 
 #Plot the Read Quality for the forward and reverse paired end reads and put them in separate PDFs
-pdf(file = "~/Fastq/Read_Quality_Profiles_FWD.pdf")
-plotQualityProfile(fnFs[1:5])
-plotQualityProfile(fnFs[6:10])
-plotQualityProfile(fnFs[11:15])
-plotQualityProfile(fnFs[16:20])
-plotQualityProfile(fnFs[21:26])
+#This part of the code does not work properly in HPC. Have to figure out how to get these plots into a PDF and put that in. Possibly assign each of the plots to variables and then use ggplot? The other option is to do the entire pipeline locally simply because the datasets are going to be small and then go on to upload the results onto the shared database. But it would be useful to actually know how to get everything onto HPC. Although saying that, even for my own data I will always need to look at the Quality profile before deciding filter criteria so maybe that should be done locally?
+pdf(file = "Read_Quality_Profiles_FWD.pdf", width = 4, height = 4)
+plotQualityProfile(fnFs[1:6])
+plotQualityProfile(fnFs[7:12])
+plotQualityProfile(fnFs[13:18])
+plotQualityProfile(fnFs[19:24])
+plotQualityProfile(fnFs[25:30])
 dev.off()
-pdf(file = "~/Fastq/Read_Quality_Profiles_REV.pdf")
-plotQualityProfile(fnRs[1:5])
-plotQualityProfile(fnRs[6:10])
-plotQualityProfile(fnRs[11:15])
-plotQualityProfile(fnRs[16:20])
-plotQualityProfile(fnRs[21:26])
+pdf(file = "Read_Quality_Profiles_REV.pdf", width = 4, height = 4)
+plotQualityProfile(fnRs[1:6])
+plotQualityProfile(fnRs[7:12])
+plotQualityProfile(fnRs[13:18])
+plotQualityProfile(fnRs[19:24])
+plotQualityProfile(fnRs[25:30])
 dev.off()
 
 # Place filtered files in filtered/ subdirectory
@@ -33,7 +34,7 @@ filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
 names(filtFs) <- sample.names
 names(filtRs) <- sample.names
 
-out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(290,250), maxN=0, maxEE=c(10,10), minQ=2, truncQ=2, rm.phix=TRUE, compress=TRUE, multithread=TRUE)
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(290,240), maxN=0, maxEE=c(10,10), minQ=2, truncQ=2, rm.phix=TRUE, compress=TRUE, multithread=FALSE)
               
 print(out)
 
