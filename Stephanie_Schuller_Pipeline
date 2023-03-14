@@ -96,9 +96,16 @@ ggsave(filename = 'ps_genus.pdf', plot=p1, width=30, height=8)
 seqtab.nochim.relative.matrix <- as.matrix(seqtab.nochim.relative.df)
 shannon_diversity <- diversity(seqtab.nochim.relative.matrix, index = "shannon")
 shannon_diversity
+shannon_diversity <- as.data.frame(shannon_diversity)
 write.csv(file = "Shannon Diversity.csv", shannon_diversity)
 shannon_plot <- ggplot(shannon_diversity, aes(x = shannon_diversity))+ geom_histogram(fill="#69b3a2", color="#e9ecef", alpha=0.9)
 ggsave(filename = "Shannon_Diversity_plot.pdf", plot = shannon_plot, width = 10, height = 15)
+rowname_to_remove <- c("Undetermined")
+seqtab_filtered <- seqtab.nochim.relative.matrix[!(row.names(seqtab.nochim.relative.matrix) %in% rowname_to_remove),]
+filtered_shannon_diversity <- diversity(seqtab_filtered, index = "shannon")
+filtered_shannon_diversity
+filtered_shannon_plot <- ggplot(shannon_diversity, aes(x = shannon_diversity))+ geom_histogram(fill="#69b3a2", color="#e9ecef", alpha=0.9)
+ggsave(filename = "Shannon_Diversity_plot_filtered.pdf", plot = shannon_plot, width = 10, height = 15)
 
 
 #To View the Plot Interactively, download the saved workspace image from R to the local machine
