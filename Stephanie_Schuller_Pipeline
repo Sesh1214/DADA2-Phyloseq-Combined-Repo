@@ -11,21 +11,11 @@ fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
 sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 
 #Plot the Read Quality for the forward and reverse paired end reads and put them in separate PDFs
-#This part of the code does not work properly in HPC. Have to figure out how to get these plots into a PDF and put that in. Possibly assign each of the plots to variables and then use ggplot? The other option is to do the entire pipeline locally simply because the datasets are going to be small and then go on to upload the results onto the shared database. But it would be useful to actually know how to get everything onto HPC. Although saying that, even for my own data I will always need to look at the Quality profile before deciding filter criteria so maybe that should be done locally?
-#pdf(file = "Read_Quality_Profiles_FWD.pdf", width = 4, height = 4)
-#plotQualityProfile(fnFs[1:6])
-#plotQualityProfile(fnFs[7:12])
-#plotQualityProfile(fnFs[13:18])
-#plotQualityProfile(fnFs[19:24])
-#plotQualityProfile(fnFs[25:30])
-#dev.off()
-#pdf(file = "Read_Quality_Profiles_REV.pdf", width = 4, height = 4)
-#plotQualityProfile(fnRs[1:6])
-#plotQualityProfile(fnRs[7:12])
-#plotQualityProfile(fnRs[13:18])
-#plotQualityProfile(fnRs[19:24])
-#plotQualityProfile(fnRs[25:30])
-#dev.off()
+#This part of the code does not work properly in HPC. Have to figure out how to get these plots into a PDF and put that in. Possibly assign each of the plots to variables and then use ggplot? The other option is to do the entire pipelin$
+pdf(file = "Read_Quality_Profiles.pdf", width = 4, height = 4)
+plotQualityProfile(fnRs)
+plotQualityProfile(fnRs)
+dev.off()
 
 # Place filtered files in filtered/ subdirectory
 filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
@@ -33,17 +23,17 @@ filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
 names(filtFs) <- sample.names
 names(filtRs) <- sample.names
 
-out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(230,240), maxN=0, maxEE=c(10,10), minQ=2, truncQ=2, rm.phix=TRUE, compress=TRUE, multithread=FALSE)
-              
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, maxN=0, maxEE=c(10,10), minQ=1, truncQ=1, rm.phix=TRUE, compress=TRUE, multithread=FALSE)
+
 print(out)
 
 errF <- learnErrors(filtFs, multithread=FALSE)
 errR <- learnErrors(filtRs, multithread=FALSE)
 
-#pdf(file = "Error_Plots.pdf", width = 4, height = 4)
-#plotErrors(errF, nominalQ=TRUE)
-#plotErrors(errR, nominalQ=TRUE)
-#dev.off()
+pdf(file = "Error_Plots.pdf", width = 4, height = 4)
+plotErrors(errF, nominalQ=TRUE)
+plotErrors(errR, nominalQ=TRUE)
+dev.off()
 
 dadaFs <- dada(filtFs, err=errF, multithread=FALSE)
 dadaRs <- dada(filtRs, err=errR, multithread=FALSE)
@@ -76,6 +66,44 @@ db_path = "/gpfs/afm/cancergenetics/Seshadhri/Stephanie_Schuller_Data/GTDB_bac-a
 taxa <- assignTaxonomy(seqtab.nochim, db_path, multithread=FALSE)
 taxa.print <- taxa # Removing sequence rownames for display only
 rownames(taxa.print) <- NULL
-head(taxa.print)
-write.csv("Taxa_Print.csv", taxa.print)
-write.csv("Seqtab_Nochim.csv", seqtab.nochim)
+print(taxa.print)
+taxa.print.df <- as.data.frame(taxa.print)
+track.df <- as.data.frame(track)
+seqtab.nochim.df <- as.data.frame(seqtab.nochim)
+write.csv(file = "Taxa_Print.csv", taxa.print.df)
+write.csv(file = "Read_Tracker.csv", track.df)
+write.csv(file = "Seqtab_Nochim.csv", seqtab.nochim.df)
+
+colnames(seqtab.nochim.df) <- c(1:ncol(seqtab.nochim.df))
+colnames(seqtab.nochim.df) <- paste("ASV", colnames(seqtab.nochim.df), sep = "_")
+seqtab.nochim.relative.df <- decostand(seqtab.nochim.df, method='total', MARGIN = 1)
+rownames(taxa.print.df) <- colnames(seqtab.nochim.df)
+taxa.print.matrix <- as.matrix(taxa.print.df)
+metadata.df <- read.csv("Metadata.csv", header = TRUE, row.names = 1)
+
+#Preparing and Creating the Phyloseq Object
+otu_tab <- otu_table(seqtab.nochim.df, taxa_are_rows = FALSE)
+sample_dat <- sample_data(metadata.df)
+tax_dat <- tax_table(taxa.print.matrix)
+ps_schuller <- merge_phyloseq(otu_tab, sample_dat, tax_dat)
+rank_names(ps_schuller)
+##Genus Level Phyloseq Object
+ps_genus <- tax_glom(ps_schuller, "Genus")
+p1 <- plot_bar(ps_genus, fill = "Genus")
+ggsave(filename = 'ps_genus.pdf', plot=p1, width=30, height=8)
+
+#Shannon Diversity Index
+seqtab.nochim.relative.matrix <- as.matrix(seqtab.nochim.relative.df)
+shannon_diversity <- diversity(seqtab.nochim.relative.matrix, index = "shannon")
+shannon_diversity
+write.csv(file = "Shannon Diversity.csv", shannon_diversity)
+shannon_plot <- ggplot(shannon_diversity, aes(x = shannon_diversity))+ geom_histogram(fill="#69b3a2", color="#e9ecef", alpha=0.9)
+ggsave(filename = "Shannon_Diversity_plot.pdf", plot = shannon_plot, width = 10, height = 15)
+
+
+#To View the Plot Interactively, download the saved workspace image from R to the local machine
+save.image(file = "Schuller_Workspace.RData")
+
+#Load the RData file into the local machine (e.g. RStudio) and then type the following code to view interactive plots
+#ps_schuller_updated <- tax_fix(ps_schuller) %>% phyloseq_validate()
+#ord_explore(ps_schuller_updated)
