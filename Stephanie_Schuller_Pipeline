@@ -87,10 +87,35 @@ sample_dat <- sample_data(metadata.df)
 tax_dat <- tax_table(taxa.print.matrix)
 ps_schuller <- merge_phyloseq(otu_tab, sample_dat, tax_dat)
 rank_names(ps_schuller)
-##Genus Level Phyloseq Object
+#Genus Level Phyloseq Object
 ps_genus <- tax_glom(ps_schuller, "Genus")
 p1 <- plot_bar(ps_genus, fill = "Genus")
 ggsave(filename = 'ps_genus.pdf', plot=p1, width=30, height=8)
+
+#Family Level Phyloseq Object
+ps_family <- tax_glom(ps_schuller, "Family")
+p2 <- plot_bar(ps_family, fill = "Family")
+ggsave(filename = "ps_family.pdf", plot = p2, width = 30, height = 8)
+
+#Order Level Phyloseq Object
+ps_order <- tax_glom(ps_schuller, "Order")
+p3 <- plot_bar(ps_family, fill = "Order")
+ggsave(filename = "ps_order.pdf", plot = p3, width = 30, height = 8)
+
+#Class Level Phyloseq Object
+ps_class <- tax_glom(ps_schuller, "Class")
+p4 <- plot_bar(ps_class, fill = "Class")
+ggsave(filename = "ps_class.pdf", plot = p4, width = 30, height = 8)
+
+#Phylum Level Phyloseq Object
+ps_phylum <- tax_glom(ps_schuller, "Phylum")
+p5 <- plot_bar(ps_phylum, fill = "Phylum")
+ggsave(filename = "ps_phylum.pdf", plot = p5, width = 30, height = 8)
+
+#Kingdom Level Phyloseq Object
+ps_kingdom <- tax_glom(ps_schuller, "Kingdom")
+p6 <- plot_bar(ps_kingdom, fill = "Kingdom")
+ggsave(filename = "ps_kingdom.pdf", plot = p6, width = 30, height = 8)
 
 #Shannon Diversity Index
 seqtab.nochim.relative.matrix <- as.matrix(seqtab.nochim.relative.df)
