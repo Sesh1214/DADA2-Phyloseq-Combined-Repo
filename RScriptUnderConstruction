@@ -284,6 +284,11 @@ for(val in genuses_to_plot){
 }
 dev.off()
 
+mcols(res)$description
+write.csv(as.data.frame(resOrdered), file = "Results_Ordered.csv")
+
+
+
 #-----------
 #Create a Phyloseq Object for Only CLuster 1
 seqtab_cluster1 <- seqtab_cluster[seqtab_cluster$sample_cluster_list2..kmeans_genus.cluster. == 1, ]
