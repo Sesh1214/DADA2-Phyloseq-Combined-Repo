@@ -1,0 +1,291 @@
+library(phyloseq)
+library(vegan)
+library(ggplot2)
+library(ape)
+library(tidyverse)
+library(microViz)
+library(factoextra)
+library(cluster)
+library(htmlwidgets)
+set.seed(202)
+seqtab_absolute_noblanks <- read.csv("seqtab_noblanks.csv", header = TRUE, row.names = 1)
+seqtab_relative_noblanks <- decostand(seqtab_absolute_noblanks, method='total', MARGIN = 1)
+write.csv(file = "seqtab_relative.csv", seqtab_relative_noblanks)
+View(seqtab_relative_noblanks)
+taxa_df <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa_matrix <- as.matrix(taxa_df)
+metadata_noblanks <- read.csv("Metadata_May2022.csv", header = TRUE, row.names = 1)
+
+#Preparing and Creating the Phyloseq Object
+otu_tab <- otu_table(seqtab_relative_noblanks, taxa_are_rows = FALSE)
+sample_dat <- sample_data(metadata_noblanks)
+tax_dat <- tax_table(taxa_matrix)
+ps <- merge_phyloseq(otu_tab, sample_dat, tax_dat)
+rank_names(ps)
+
+#Genus Level Phyloseq Object
+ps_genus <- tax_glom(ps, "Genus")
+p1 <- plot_bar(ps_genus, fill = "Genus")
+ggsave(filename = 'ps_genus.pdf', plot=p1, width=30, height=8)
+
+#Family level Phyloseq Object
+ps_family <- tax_glom(ps, "Family")
+p2 <- plot_bar(ps_family, fill = "Family")
+ggsave(filename = 'ps_family.pdf', plot=p2, width=30, height=8)
+
+
+#Making This Interactive with Plotly and Viewing it on the local browser. This does it for the entire phyloseq object
+#ps_updated <- tax_fix(ps) %>% phyloseq_validate()
+#ord_explore(ps_updated)
+
+#Heatmap
+genus_heatmap <- plot_heatmap(ps, "PCoA", "manhattan", taxa.label = "Genus", taxa.order = "Genus", low = "#66CCFF", high = "#000033", na.value = "white")
+ggsave(filename = "genus_heatmap.pdf", plot = genus_heatmap, width = 30, height = 8)
+family_heatmap <- plot_heatmap(ps, "PCoA", "manhattan", taxa.label = "Family", taxa.order = "Family", low = "#66CCFF", high = "#000033", na.value = "white")
+ggsave(filename = "family_heatmap.pdf", plot = genus_heatmap, width = 30, height = 8)
+
+#Plot Ordination
+ps.ord <- ordinate(ps, "PCoA", "manhattan")
+p1 <- plot_ordination(ps, ps.ord, type = "taxa", color = "Genus", title = "Genus Ordination Plot")
+ggsave(filename = "Genus_PCOA.pdf", plot = p1, width = 30, height = 8)
+p2 <- plot_ordination(ps, ps.ord, type = "taxa", color = "Family", title = "Family Ordination Plot")
+ggsave(filename = "Family_PCOA.pdf", plot = p2, width = 30, height = 8)
+p3 <- plot_ordination(ps, ps.ord, type = "samples", label = "sample_id", color = "metastasis", title = "Metastatic Samples")
+ggsave(filename = "Metastatic Samples.pdf", plot = p3, width = 30, height = 8)
+p4 <- plot_ordination(ps, ps.ord, type = "samples", label = "sample_id", color = "subcategory_at_initial_urine_collection", title = "Subcategory at Initial Urine Collection")
+ggsave(filename = "Subcategory at Initial Urine Collection.pdf", plot = p4, width = 30, height = 8)
+
+#PCOA Plot After Extracting Co-Ordinates
+class(seqtab_relative_noblanks)
+seqtab_matrix <- as.matrix(seqtab_relative_noblanks)
+dist_matrix_genus <- dist(seqtab_matrix, method = "manhattan")
+pcoa_genus <- pcoa(dist_matrix_genus, correction = "none", rn = NULL)
+biplot_genus <- biplot(pcoa_genus, plot.axes = c(1,2), dir.axis1=1, dir.axis2=1, rn = NULL, main = NULL)
+biplot_genus
+
+#Extract the Axis co-ordinates and do K-Means on them
+pcoa_genus$vectors
+pcoa_coords <- as.data.frame(pcoa_genus$vectors)
+head(pcoa_coords)
+pcoa_coords_final1 <- as.data.frame(pcoa_coords$Axis.1)
+pcoa_coords_final2 <- as.data.frame(pcoa_coords$Axis.2)
+pcoa_coords_genus_final <- cbind(pcoa_coords_final1, pcoa_coords_final2)
+kmeans_genus <- kmeans(pcoa_coords_genus_final, 3, nstart = 20)
+kmeans_genus
+kmeans_plot <- plot(pcoa_coords_genus_final, col = (kmeans_genus$cluster + 1), main = "K-Means Clustering of Samples - May 2022", xlab = "", ylab = "", pch = 20, cex = 2)
+ggsave(filename = "KMeansClustering.pdf", plot = kmeans_plot, width = 30, height = 8)
+kmeans_clusterdata <- as.data.frame(kmeans_genus$cluster)
+sample_list <- cbind(kmeans_clusterdata, pcoa_coords_genus_final)
+head(sample_list)
+rownames(seqtab_absolute_noblanks)
+rownames(sample_list) <- rownames(seqtab_absolute_noblanks)
+head(sample_list)
+sample_cluster_list <- cbind(sample_list, metadata_noblanks)
+head(sample_cluster_list)
+sample_cluster_list2 <- sample_cluster_list[, -4]
+sample_cluster_list2 <- sample_cluster_list2[, -10]
+head(sample_cluster_list2)
+write.csv(file = "Sample_Cluster_List.csv", sample_cluster_list)
+ggplot(sample_cluster_list2, aes(x=pcoa_coords$Axis.1, y=pcoa_coords$Axis.2, color = metastasis)) + geom_point(alpha = 0.5, size = 2) + geom_text(aes(label = rownames(sample_list)))
+
+head(seqtab_relative_noblanks)
+cluster_list <- data.frame(sample_cluster_list2$`kmeans_genus$cluster`)
+seqtab_cluster <- cbind(cluster_list, seqtab_relative_noblanks)
+
+#Get Abundance Table at Genus Level using the Genus Phyloseq Object
+genus_abundance <- as.data.frame(otu_table(ps_genus))
+genus_taxa <- as.data.frame(tax_table(ps_genus))
+genus_names <- as.list(genus_taxa$Genus)
+colnames(genus_abundance) <- genus_names
+write.csv(file = "Genus_Abundance_Table.csv", genus_abundance)
+
+#Try to Get a Phyloseq Object without Decostand Transformation
+seqtab_absolute_noblanks <- read.csv("seqtab_noblanks.csv", header = TRUE, row.names = 1)
+taxa_df <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa_matrix <- as.matrix(taxa_df)
+metadata_noblanks <- read.csv("Metadata_May2022.csv", header = TRUE, row.names = 1)
+otu_tab_absolute <- otu_table(seqtab_absolute_noblanks, taxa_are_rows = FALSE)
+sample_dat_absolute <- sample_data(metadata_noblanks)
+tax_dat_absolute <- tax_table(taxa_matrix)
+ps_absolute <- merge_phyloseq(otu_tab_absolute, sample_dat_absolute, tax_dat_absolute)
+ps_absolute_genus <- tax_glom(ps_absolute, "Genus")
+genus_absolute_abundance <- as.data.frame(otu_table(ps_absolute_genus))
+genus_taxa_absolute <- as.data.frame(tax_table(ps_absolute_genus))
+genus_names_absolute <- as.list(genus_taxa_absolute$Genus)
+colnames(genus_absolute_abundance) <- genus_names_absolute
+write.csv(file = "Genus_Absolute_Abundance_Table.csv", genus_absolute_abundance)
+
+#--------
+  
+
+#Selection of Genuses and Samples
+genus_absolute_abundance[genus_absolute_abundance<100] <- 0
+genus_absolute_abundance[is.na(genus_absolute_abundance)] <- 0
+genus_absolute_abundance$sample_totals <- rowSums(genus_absolute_abundance)
+genus_absolute_abundance <- genus_absolute_abundance %>% filter(sample_totals > 0) 
+genus_absolute_abundance[nrow(genus_absolute_abundance) + 1, ] <- colSums(genus_absolute_abundance)
+row.names(genus_absolute_abundance)[62] <- "genus_total"
+genus_absolute_abundance_transformed <- t(genus_absolute_abundance)
+class(genus_absolute_abundance_transformed)
+genus_absolute_abundance_transformed <- subset(genus_absolute_abundance_transformed, select = -c(62))
+metadata_deseq <- t(metadata_noblanks)
+metadata_deseq <- subset(metadata_deseq, select = -c(27))
+metadata_deseq <- t(metadata_deseq)
+rownames(metadata_deseq)
+write.csv(file = "metadata_deseq.csv", metadata_deseq)
+write.csv(file = "genus_deseq.csv", genus_absolute_abundance_transformed)
+
+#Using DESeq2 for analysis
+install.packages("htmltools")
+library(htmltools)
+if(!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(version="3.16")
+BiocManager::install("DESeq2")
+library("DESeq2")
+all(rownames(metadata_deseq) %in% colnames(genus_absolute_abundance_transformed))
+all(rownames(metadata_deseq) == colnames(genus_absolute_abundance_transformed))
+
+#ideal - Interactive Differential Expression Analysis in RNA-Seq Data - Shiny version of DeSeq2 - sort of
+if(!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(version="3.16")
+BiocManager::install("ideal")
+library(ideal)
+dds <- DESeqDataSetFromMatrix(countData = genus_absolute_abundance_transformed, colData = metadata_deseq, design = ~ metastasis)
+dds
+dds <- DESeq(dds)
+res <- results(dds)
+res
+res2 <- results(dds, contrast = c("metastasis", "No_metastasis", "Metastasis_Present"))
+res2
+resultsNames(dds)
+#Log-fold Change
+if(!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(version="3.16")
+BiocManager::install("apeglm")
+library(apeglm)
+resLFC <- lfcShrink(dds, coef = "metastasis_No_metastasis_vs_Metastasis_Present", type = "apeglm")
+resLFC
+#Order by p-value
+resOrdered <- res[order(res$pvalue), ]
+resOrdered
+summary(res)
+sum(res$padj < 0.1, na.rm=TRUE)
+
+
+#Independent Hypothesis Weighting - Multiple Testing Correction
+library(IHW)
+resIHW <- results(dds, filterFun=ihw)
+summary(resIHW)
+sum(resIHW$padj < 0.1, na.rm=TRUE)
+metadata(resIHW)$ihwResult
+
+#Function to do PlotCount plots for all the bacterial genuses
+genuses_to_plot <- c(rownames(genus_absolute_abundance_transformed))
+genuses_to_plot <- genuses_to_plot[-199]
+pdf(file = "Genuses Counts Plot", width = 6, height = 6)
+for(val in genuses_to_plot){
+  plotCounts(dds, gene = val, intgroup = "metastasis")
+}
+dev.off()
+
+#-----------
+#Create a Phyloseq Object for Only CLuster 1
+seqtab_cluster1 <- seqtab_cluster[seqtab_cluster$sample_cluster_list2..kmeans_genus.cluster. == 1, ]
+head(seqtab_cluster1)
+taxa_1 <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa1_matrix <- as.matrix(taxa_1)
+cluster1_metadata <- sample_cluster_list2[sample_cluster_list$`kmeans_genus$cluster` == 1, ] 
+
+otu_tab1 <- otu_table(seqtab_cluster1, taxa_are_rows = FALSE)
+sample_dat1 <- sample_data(cluster1_metadata)
+tax_dat1 <- tax_table(taxa1_matrix)
+ps1 <- merge_phyloseq(otu_tab1, sample_dat1, tax_dat1)
+rank_names(ps1)
+ps1_updated <- tax_fix(ps1) %>% phyloseq_validate()
+ord_explore(ps1_updated)
+
+#Create a Phyloseq Object for Only Cluster 2
+seqtab_cluster2 <- seqtab_cluster[seqtab_cluster$sample_cluster_list2..kmeans_genus.cluster. == 2, ]
+head(seqtab_cluster2)
+taxa_2 <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa2_matrix <- as.matrix(taxa_2)
+cluster2_metadata <- sample_cluster_list2[sample_cluster_list$`kmeans_genus$cluster` == 2, ] 
+
+otu_tab2 <- otu_table(seqtab_cluster2, taxa_are_rows = FALSE)
+sample_dat2 <- sample_data(cluster2_metadata)
+tax_dat2 <- tax_table(taxa2_matrix)
+ps2 <- merge_phyloseq(otu_tab2, sample_dat2, tax_dat2)
+rank_names(ps2)
+ps2_updated <- tax_fix(ps2) %>% phyloseq_validate()
+ord_explore(ps2_updated)
+
+
+#Create a Phyloseq Object for Only Cluster 3 - This is the one with most metastatic samples
+seqtab_cluster3 <- seqtab_cluster[seqtab_cluster$sample_cluster_list2..kmeans_genus.cluster. == 3, ]
+head(seqtab_cluster3)
+taxa_3 <- read.csv("taxa.csv", header = TRUE, sep = ",", row.names = 1)
+taxa3_matrix <- as.matrix(taxa_3)
+cluster3_metadata <- sample_cluster_list2[sample_cluster_list$`kmeans_genus$cluster` == 3, ] 
+
+otu_tab3 <- otu_table(seqtab_cluster3, taxa_are_rows = FALSE)
+sample_dat3 <- sample_data(cluster3_metadata)
+tax_dat3 <- tax_table(taxa3_matrix)
+ps3 <- merge_phyloseq(otu_tab3, sample_dat3, tax_dat3)
+rank_names(ps3)
+ps3_updated <- tax_fix(ps3) %>% phyloseq_validate()
+ord_explore(ps3_updated)
+
+#Network analysis
+ps_network <- plot_net(ps, type = "taxa", distance = "manhattan", point_alpha = 1, point_label = "Genus", rescale = TRUE, point_size = 2)
+ggsave(filename = "Phyloseq_Network.pdf", plot = ps_network, width = 40, height = 30)
+ps_network_build <- ggplot_build(ps_network)
+head(ps_network_build$data[[3]])
+ps_network_data <- ps_network_build$data[[3]]
+ps_network_coords <- data.frame(ps_network_data$label, ps_network_data$x, ps_network_data$y)
+head(ps_network_coords)
+ggplot(ps_network_coords, aes(x=ps_network_data.x, y = ps_network_data.y))+ geom_point()
+ps_network_coords_matrix <- as.matrix(ps_network_coords)
+ps_network_coords_matrix[is.na(ps_network_coords_matrix)] <- "Genus unassigned"
+ps_network_coords_only <- data.frame(ps_network_coords$ps_network_data.x, ps_network_coords$ps_network_data.y)
+fviz_nbclust(ps_network_coords_only, kmeans, method = "silhouette")
+fviz_nbclust(ps_network_coords_only, kmeans, method = "wss")
+kmeans_ps_network_two <- kmeans(ps_network_coords_only, 2, nstart = 20)
+kmeans_ps_network_two
+#kmeans_ps_network_four <- kmeans(ps_network_coords_only, 4, nstart = 20)
+#kmeans_ps_network_four
+#kmeans_ps_network_seven <- kmeans(ps_network_coords_only, 7, nstart = 20)
+#kmeans_ps_network_seven
+#ps_network_coords_3cluster <- cbind(ps_network_coords, kmeans_ps_network_three$cluster)
+#head(ps_network_coords_3cluster)
+#kmeans_plot_3 <- plot(ps_network_coords_only, col = (kmeans_ps_network_three$cluster + 1), main = "K-Means Clustering of Bacterial Genuses in May 2022 Samples, k = 3", xlab = "", ylab = "", pch = 20, cex = 0.5)
+#cluster1_genuses <- ps_network_coords_3cluster[ps_network_coords_3cluster$`kmeans_ps_network_three$cluster` == 1, ]
+#cluster3_genuses <- ps_network_coords_3cluster[ps_network_coords_3cluster$`kmeans_ps_network_three$cluster` == 3, ]
+#cluster2_genuses <- ps_network_coords_3cluster[ps_network_coords_3cluster$`kmeans_ps_network_three$cluster` == 2, ]
+ps_network_coords_2cluster <- cbind(ps_network_coords, kmeans_ps_network_two$cluster)
+head(ps_network_coords_2cluster)
+kmeans_plot_2 <- plot(ps_network_coords_only, col = (kmeans_ps_network_two$cluster + 1), main = "K-Means Clustering of Bacterial Genuses in May 2022 Samples, k = 2", xlab = "", ylab = "", pch = 20, cex = 0.5)
+cluster1_genuses <- ps_network_coords_2cluster[ps_network_coords_2cluster$`kmeans_ps_network_two$cluster` == 1, ]
+cluster2_genuses <- ps_network_coords_2cluster[ps_network_coords_2cluster$`kmeans_ps_network_two$cluster` == 2, ]
+write.csv(file = "cluster1_genuses.csv", cluster1_genuses)
+write.csv(file = "cluster2_genuses.csv", cluster2_genuses)
+head(cluster1_genuses)
+head(cluster2_genuses)
+abbs_cluster1 <- cluster1_genuses %>% filter_all(any_vars(. %in% c('Porphyromonas', 'Fenollaria', 'Anaerococcus', 'Ezakiella', 'Fusobacterium', 'Peptoniphilus')))
+abbs_cluster2 <- cluster2_genuses %>% filter_all(any_vars(. %in% c('Porphyromonas', 'Fenollaria', 'Anaerococcus', 'Ezakiella', 'Fusobacterium', 'Peptoniphilus')))
+
+#Wilcox Test
+seqtab1_matrix <- as.matrix(seqtab_cluster1)
+seqtab2_matrix <- as.matrix(seqtab_cluster2)
+seqtab3_matrix <- as.matrix(seqtab_cluster3)
+wilcox_result12 <- wilcox.test(seqtab1_matrix, seqtab2_matrix)
+wilcox_result13 <- wilcox.test(seqtab1_matrix, seqtab3_matrix)
+wilcox_result23 <- wilcox.test(seqtab2_matrix, seqtab3_matrix)
+seqtab12_matrix <- rbind(seqtab1_matrix,seqtab2_matrix)
+wilcox_result3_12 <- wilcox.test(seqtab3_matrix, seqtab12_matrix)
+wilcox_result12
+wilcox_result13
+wilcox_result23
+wilcox_result3_12
