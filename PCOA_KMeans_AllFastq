@@ -1,7 +1,7 @@
 #NAMES IN THE WORKFLOW NEED TO BE STANDARDISED
 #Before starting, make sure to unzip the fastq files. Also do an interactive session and load R/4.2.1. Can use gzip -d command on terminal to do this
 library(dada2)
-path <- "/gpfs/afm/cancergenetics/Seshadhri/Stephanie_Schuller_Data/Fastq"
+path <- "/gpfs/home/yfe22ruu/Fastq_files_all"
 #The list files command should list all the paired end reads for each sample.
 list.files(path)
 
@@ -12,9 +12,8 @@ fnRs <- sort(list.files(path, pattern="_R2_001.fastq", full.names = TRUE))
 sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 
 #Plot the Read Quality for the forward and reverse paired end reads and put them in separate PDFs
-#This part of the code does not work properly in HPC. Have to figure out how to get these plots into a PDF and put that in. Possibly assign each of the plots to variables and then use ggplot? The other option is to do the entire pipelin$
 pdf(file = "Read_Quality_Profiles.pdf", width = 4, height = 4)
-plotQualityProfile(fnRs)
+plotQualityProfile(fnFs)
 plotQualityProfile(fnRs)
 dev.off()
 
@@ -62,7 +61,7 @@ colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "n
 rownames(track) <- sample.names
 head(track)
 
-db_path = "/gpfs/afm/cancergenetics/Seshadhri/Stephanie_Schuller_Data/GTDB_bac-arc_ssu_r86.fa.gz"
+db_path = "/gpfs/home/yfe22ruu/GTDB_bac-arc_ssu_r86.fa.gz"
 
 taxa <- assignTaxonomy(seqtab.nochim, db_path, multithread=FALSE)
 taxa.print <- taxa # Removing sequence rownames for display only
@@ -85,7 +84,7 @@ library(factoextra)
 library(cluster)
 library(htmlwidgets)
 
-set.seed(202)
+set.seed(89)
 colnames(seqtab.nochim.df) <- c(1:ncol(seqtab.nochim.df))
 colnames(seqtab.nochim.df) <- paste("ASV", colnames(seqtab.nochim.df), sep = "_")
 seqtab.nochim.relative.df <- decostand(seqtab.nochim.df, method='total', MARGIN = 1)
@@ -157,7 +156,9 @@ seqtab_matrix <- as.matrix(seqtab.nochim.relative.df)
 dist_matrix_genus <- dist(seqtab_matrix, method = "manhattan")
 pcoa_genus <- pcoa(dist_matrix_genus, correction = "none", rn = NULL)
 biplot_genus <- biplot(pcoa_genus, plot.axes = c(1,2), dir.axis1=1, dir.axis2=1, rn = NULL, main = NULL)
-biplot_genus
+pdf(file = "Genus_Biplot.pdf", width = 8, height = 8)
+biplot_genus <- biplot(pcoa_genus, plot.axes = c(1,2), dir.axis1=1, dir.axis2=1, rn = NULL, main = NULL)
+dev.off()
 
 #Extract the Axis co-ordinates and do K-Means on them
 pcoa_genus$vectors
@@ -182,4 +183,5 @@ sample_cluster_list2 <- sample_cluster_list[, -4]
 sample_cluster_list2 <- sample_cluster_list2[, -10]
 head(sample_cluster_list2)
 write.csv(file = "Sample_Cluster_List.csv", sample_cluster_list)
-ggplot(sample_cluster_list2, aes(x=pcoa_coords$Axis.1, y=pcoa_coords$Axis.2, color = metastasis)) + geom_point(alpha = 0.5, size = 2) + geom_text(aes(label = rownames(sample_list)))
+sample_cluster_plot <- ggplot(sample_cluster_list2, aes(x=pcoa_coords$Axis.1, y=pcoa_coords$Axis.2, color = metastasis)) + geom_point(alpha = 0.5, size = 2) + geom_text(aes(label = rownames(sample_list)))
+ggsave(filename = "Sample_Cluster_Plot.pdf", plot = sample_cluster_plot, width = 30, height = 8)
